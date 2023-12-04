@@ -1,0 +1,970 @@
+---
+title: "RECOMMENDATION_SYSTEM"
+author: "SOMTO GODWIN"
+date: "2023-12-01"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+# Data Preparation
+
+## Install Libraries
+
+```{r, echo=TRUE}
+# Check if libraries are installed, if not, install them
+if (!requireNamespace("tidyverse", quietly = TRUE)) 
+  install.packages("tidyverse", repos = "http://cran.us.r-project.org")
+if (!requireNamespace("caret", quietly = TRUE)) 
+  install.packages("caret", repos = "http://cran.us.r-project.org")
+if (!requireNamespace("data.table", quietly = TRUE)) 
+  install.packages("data.table", repos = "http://cran.us.r-project.org")
+if (!requireNamespace("cowplot", quietly = TRUE)) 
+  install.packages("cowplot", repos = "http://cran.us.r-project.org")
+if (!requireNamespace("lubridate", quietly = TRUE)) 
+  install.packages("lubridate", repos = "http://cran.us.r-project.org")
+if (!requireNamespace("Metrics", quietly = TRUE)) 
+  install.packages("Metrics", repos = "http://cran.us.r-project.org")
+if (!requireNamespace("recosystem", quietly = TRUE)) 
+  install.packages("recosystem", repos = "http://cran.us.r-project.org")
+if (!requireNamespace("scales", quietly = TRUE)) 
+  install.packages("scales", repos = "http://cran.us.r-project.org")
+if (!requireNamespace("stringr", quietly = TRUE)) 
+  install.packages("stringr", repos = "http://cran.us.r-project.org")
+if (!requireNamespace("tibble", quietly = TRUE)) 
+  install.packages("tibble", repos = "http://cran.us.r-project.org")
+if (!requireNamespace("tidyr", quietly = TRUE)) 
+  install.packages("tidyr", repos = "http://cran.us.r-project.org")
+if (!require(tidyverse)) install.packages("tidyverse")
+
+# Loading the required libraries
+library(caret)
+library(cowplot)
+library(data.table)
+library(dplyr)
+library(ggplot2)
+library(ggthemes)
+library(lubridate)
+library(Metrics)
+library(recosystem)
+library(scales)
+library(stringr)
+library(tibble)
+library(tidyr)
+library(tidyverse)
+```
+# Brief Description of Libraries
+
+## caret
+The `caret` library, short for "Classification And Regression Training," is a widely-used R package for machine learning tasks. It provides a diverse set of tools to streamline classification and regression tasks, making it a go-to choice for data scientists.
+
+## cowplot
+`cowplot` is a library designed to simplify the creation of publication-quality figures. It enhances the ease of constructing visually appealing graphics for effective data representation.
+
+## data.table
+`data.table` is a high-performance library in R that facilitates efficient manipulation and operation of dataframes. It is known for its speed and optimization capabilities, making it a preferred choice for large-scale data tasks.
+
+## dplyr
+Arguably the most popular R package for data manipulation, `dplyr` offers a consistent set of tools for intuitive and user-friendly data manipulation. Data analysts commonly use it to transform datasets into suitable formats for analysis, exploration, and visualization.
+
+## ggplot2
+`ggplot2` stands out as the most popular library for data visualization in R. Renowned for its customizability and efficiency, it significantly improves the quality and aesthetics of graphics.
+
+## ggthemes
+Built upon the support provided by ggplot2 and its official extension, `ggthemes` offers additional themes for ggplot2 graphics. It allows developers to easily create customized tools and presets for enhanced visualization.
+
+## lubridate
+`lubridate` is designed to simplify and accelerate time-related tasks and calculations. It provides an efficient solution for working with temporal data in R.
+
+## Metrics
+The `Metrics` library is centered around evaluation metrics, offering functions that simplify the calculation of metrics for assessing model performance.
+
+## recosystem
+Built around matrix factorization, `recosystem` bundles a collection of functions to streamline the process of recommendation systems. It simplifies the implementation of matrix factorization techniques.
+
+## scales
+Included for proper axis scaling in plots, the `scales` library enhances the visualization of data by ensuring appropriate scaling on plot axes.
+
+## stringr
+`stringr` is a library that provides a set of functions designed to simplify working with strings. It offers convenient tools for string manipulation tasks.
+
+## tibble
+`tibble` re-imagines the dataframe format, providing a cleaner and more modern solution for data representation. It tidies up the dataframe structure for improved readability.
+
+## tidyr
+`tidyr` simplifies the process of tidying data, making it easily evaluable and standardizing it into a format compatible with most functions. It contributes to data cleaning and organization tasks.
+
+## MovieLens Dataset Overview
+The MovieLens dataset, provided by GroupLens Research via [MovieLens website](https://movielens.org), consists of rating data for movies. Users can rate movies on the website, and these datasets are made available for research purposes. It is essential to review the README files accompanying the datasets for usage licenses and other relevant details.
+
+The dataset, gathered by GroupLens, includes 27 million ratings given to 58,000 movies by 280,000 users. Due to the substantial size, only a small subset of the data will be used for this exercise, specifically the MovieLens 10M subset.
+
+## MovieLens 10M Dataset
+The MovieLens 10M dataset is a stable benchmark dataset containing 10 million ratings and 100,000 tag applications applied to 10,000 movies by 72,000 users. It was released in January 2009. The dataset is available for download [here](https://grouplens.org/datasets/movielens/10m/), with a size of 63 MB.
+
+### Dataset Components
+- `ratings.dat`: A four-column dataset containing user ID, movie ID, the user's rating for the movie, and a timestamp.
+- `movies.dat`: A three-column dataset containing movie ID, movie title, and movie genres.
+
+## import The ratings.dat is into the workspace
+The movie rating data is computationally expensive so ill randomly consider 10 percent of the overall Dataset.
+
+
+```{r setup, include=FALSE}
+
+# Specify the path to ratings.dat on your local computer
+ratings_file_path <- "C:/Users/Somto/Documents/Git/R_DATA/ratings.dat"
+
+# Import ratings data using fread
+ratings <- data.table::fread(
+  text = gsub("::", "\t", readLines(ratings_file_path)),
+  col.names = c("userId", "movieId", "rating", "timestamp")
+)
+
+# Display the original number of entries
+original_entries <- nrow(ratings)
+original_entries
+
+# Set the fraction to keep (e.g., 0.1 for 10%)
+fraction_to_keep <- 0.1
+
+# Reduce the dataset size randomly
+set.seed(123)  # for reproducibility
+ratings <- ratings[sample(nrow(ratings), size = fraction_to_keep * nrow(ratings)), ]
+
+# Display the number of entries in the sampled dataset
+sampled_entries <- nrow(ratings)
+sampled_entries
+```
+
+
+## import The movies.dat is into the workspace
+
+```{r, include=FALSE}
+# Specify the path to movies.dat on your local computer
+movies <- str_split_fixed(readLines("C:/Users/Somto/Documents/Git/R_DATA/ratings.dat"), "\\::", 3)
+colnames(movies) <- c("movieId", "title", "genres")
+
+
+# Display the first few rows of the movies data
+head(movies)
+
+
+# Display the class of the ratings data
+class(movies)
+```
+
+```{r}
+# The movies object is converted into a dataframe
+movies <- as.data.frame(movies) %>% 
+  mutate(movieId = as.numeric(movieId),
+         title = as.character(title),
+         genres = as.character(genres))
+
+# Check the class of the 'movies' dataframe
+class(movies)
+
+# Display the first few rows of the 'movies' dataframe
+head(movies)
+```
+```{r}
+# Truncate the movies dataset to 10% using sample_frac
+fraction_to_keep <- 0.1
+movies <- movies %>% sample_frac(fraction_to_keep)
+
+# Check the class of the truncated 'movies' dataframe
+class(movies)
+
+# Display the first few rows of the truncated 'movies' dataframe
+head(movies)
+```
+
+## Ratings and movies dataframes are joined by "movieId"
+```{r}
+# Join ratings and movies dataframes by "movieId"
+filmography <- left_join(ratings, movies, by = "movieId")
+
+# Check the class of the 'filmography' dataframe
+class(filmography)
+
+# Display the first few rows of the 'filmography' dataframe
+head(filmography)
+```
+## Model evaluation
+
+### The validation set
+To assess the system's performance, a validation set is created from a small subset of the filmography dataset. The RMSE (Root Mean Square Error) will be calculated on this validation set. The R functions nrow() and sample() are employed to randomly choose row indexes for splitting the filmography dataset into a working set and a validation set. The code snippet demonstrates this split, with 10% of the dataset's indexes forming the validation set and the remaining 90% creating the working_set object. The validation set is temporarily named 'temp' at this stage, as it lacks essential steps to be a valid validation set. Finally, the tibble() function is used to present the lengths of the different sets in a table-like structure.
+
+```{r}
+# set.seed(1, sample.kind="Rounding") # if using R 3.5 or earlier, use `set.seed(1)`
+set.seed(1)
+test_index <- createDataPartition(y = filmography$rating, times = 1, p = 0.1, list = FALSE)
+working_set <- filmography[-test_index,]
+temp <- filmography[test_index,]
+
+tibble(Dataset = c("filmography", "working_set", "temp"),
+       "Number of ratings" = c(nrow(filmography), nrow(working_set), nrow(temp)))
+```
+
+##  Make sure userId and movieId in validation set are also in working_set set
+```{r}
+validation <- temp %>% 
+  semi_join(working_set, by = "movieId") %>%
+  semi_join(working_set, by = "userId")
+
+# Add rows removed from validation set back into working_set set
+removed <- anti_join(temp, validation)
+working_set <- rbind(working_set, removed)
+```
+
+## Data exploration
+```{r}
+dim(working_set)
+class(working_set)
+str(working_set, vec.len = 2)
+head(working_set)
+summary(working_set)
+```
+## Ratings
+```{r}
+# Rating count
+working_set %>%
+  group_by(rating) %>%
+  summarize(count = n())
+```
+
+## Rating distribution plot
+```{r}
+working_set %>%
+  group_by(rating) %>%
+  summarize(count = n()) %>%
+  ggplot(aes(x = rating, y = count)) +
+  geom_bar(stat = "identity", fill = "#8888ff") +
+  ggtitle("Rating Distribution") +
+  xlab("Rating") +
+  ylab("Occurrences Count") +
+  scale_y_continuous(labels = scales::comma) +
+  scale_x_continuous(n.breaks = 10) +
+  theme_economist() +
+  theme(axis.title.x = element_text(vjust = -5, face = "bold"), 
+        axis.title.y = element_text(vjust = 10, face = "bold"), 
+        plot.margin = margin(0.7, 0.5, 1, 1.2, "cm"))
+```
+
+## Timestamps
+```{r}
+# as_datetime() showcase
+sample(as_datetime(working_set$timestamp, origin = "1970-01-01"), replace = TRUE, size = 20)
+```
+## Yearly rating count
+```{r}
+working_set %>% 
+  mutate(year = year(as_datetime(timestamp, origin = "1970-01-01"))) %>%
+  group_by(year) %>%
+  summarize(count = n())
+```
+## Ratings by Year Plot
+```{r}
+working_set %>% 
+  mutate(year = year(as_datetime(timestamp, origin = "1970-01-01"))) %>%
+  ggplot(aes(x = year)) +
+  geom_bar(fill = "#8888ff") + 
+  ggtitle("Ratings per year") +
+  xlab("Year") +
+  ylab("Number of ratings") +
+  scale_y_continuous(labels = comma) + 
+  theme_economist() +
+  theme(axis.title.x = element_text(vjust = -5, face = "bold"), 
+        axis.title.y = element_text(vjust = 10, face = "bold"), 
+        plot.margin = margin(0.7, 0.5, 1, 1.2, "cm"))
+```
+
+## Average Ratings Per Year Plot
+```{r}
+working_set %>% 
+  mutate(year = year(as_datetime(timestamp, origin = "1970-01-01"))) %>%
+  group_by(year) %>%
+  summarize(avg = mean(rating)) %>%
+  ggplot(aes(x = year, y = avg)) +
+  geom_bar(stat = "identity", fill = "#8888ff") + 
+  ggtitle("Average rating per year") +
+  xlab("Year") +
+  ylab("Average rating") +
+  scale_y_continuous(labels = comma) + 
+  theme_economist() +
+  theme(axis.title.x = element_text(vjust = -5, face = "bold"), 
+        axis.title.y = element_text(vjust = 10, face = "bold"), 
+        plot.margin = margin(0.7, 0.5, 1, 1.2, "cm"))
+```
+
+## Ratings per Movies
+### Most Popular Movies
+```{r}
+working_set %>% 
+  group_by(movieId) %>% 
+  summarize(count = n()) %>%
+  slice_head(n = 10)
+```
+## Movie ratings per Movie
+```{r}
+working_set %>%
+  group_by(movieId) %>%
+  summarize(count = n()) %>%
+  ggplot(aes(x = movieId, y = count)) +
+  geom_point(alpha = 0.2, color = "#4020dd") +
+  geom_smooth(color = "red") +
+  ggtitle("Ratings per movie") +
+  xlab("Movies") +
+  ylab("Number of ratings") +
+  scale_y_continuous(labels = comma) +
+  scale_x_continuous(n.breaks = 10) +
+  theme_economist() +
+  theme(axis.title.x = element_text(vjust = -5, face = "bold"), 
+        axis.title.y = element_text(vjust = 10, face = "bold"), 
+        plot.margin = margin(0.7, 0.5, 1, 1.2, "cm"))
+```
+## GENRES
+### Genres count
+```{r}
+# Movie genres count
+working_set %>% 
+  group_by(genres) %>% 
+  summarize(count = n()) %>%
+  slice_max(order_by = count, n = 8)
+```
+```{r}
+# Individual genres count
+genres <- c("Action", "Adventure", "Animation", 
+            "Children", "Comedy", "Crime", 
+            "Documentary", "Drama", "Fantasy", 
+            "Film-Noir", "Horror", "Musical", 
+            "Mystery", "Romance", "Sci-Fi", 
+            "Thriller", "War", "Western")
+
+genres_df <- data.frame(
+  Genres = genres,
+  Count = sapply(genres, function(x) {
+    sum(sapply(str_extract_all(working_set$genres, regex(x, ignore_case = TRUE)), length))
+  })
+)
+
+print(genres_df)
+```
+## Genre popularity plot
+```{r}
+genres_df %>%
+  ggplot(aes(x = Count, y = Genres)) +
+  ggtitle("Genre Popularity") +
+  geom_bar(stat = "identity", width = 0.6, fill = "#8888ff") +
+  xlab("Number of ratings") +
+  ylab("Genres") +
+  scale_x_continuous(labels = comma) +
+  theme_economist() +
+  theme(plot.title = element_text(vjust = 3.5),
+        axis.title.x = element_text(vjust = -5, face = "bold"),
+        axis.title.y = element_text(vjust = 10, face = "bold"),
+        axis.text.x = element_text(vjust = 1, hjust = 1, angle = 0),
+        axis.text.y = element_text(vjust = 0.25, hjust = 1, size = 12),
+        plot.margin = margin(0.7, 0.5, 1, 1.2, "cm"))
+```
+## Genre popularity plot
+```{r}
+genres_df %>%
+  ggplot(aes(x = Count, y = Genres)) +
+  ggtitle("Genre Popularity") +
+  geom_bar(stat = "identity", width = 0.6, fill = "#8888ff") +
+  xlab("Number of ratings") +
+  ylab("Genres") +
+  scale_x_continuous(labels = scales::comma) +
+  theme_economist() +
+  theme(
+    plot.title = element_text(vjust = 3.5),
+    axis.title.x = element_text(vjust = -5, face = "bold"),
+    axis.title.y = element_text(vjust = 10, face = "bold"),
+    axis.text.x = element_text(vjust = 1, hjust = 1, angle = 0),
+    axis.text.y = element_text(vjust = 0.25, hjust = 1, size = 12),
+    plot.margin = margin(0.7, 0.5, 1, 1.2, "cm")
+  )
+```                               
+Next i'll inspect the Training Data
+```{r}
+# How many rows and columns are there in the training dataset?
+# Rows
+n_rows <- dim(working_set)[1]
+# Columns
+n_cols <- dim(working_set)[2]
+n_rows
+n_cols
+
+# How many zeros were given as ratings in the training dataset?
+n_zeros <- sum(working_set$rating == 0.0)
+n_zeros
+
+# How many threes were given as ratings in the training dataset?
+n_threes <- sum(working_set$rating == 3.0)
+n_threes
+
+# How many different movies are in the training dataset?
+n_movies <- dim(as.data.frame(table(working_set$movieId)))[1]
+n_movies
+
+# How many different users are in the training dataset?
+n_users <- dim(as.data.frame(table(working_set$userId)))[1]
+n_users
+```
+## System modelling
+
+### Train-test split
+# Train-test split using createDataPartition
+
+## Approach 1: training index
+
+```{r}
+# set.seed(1, sample.kind="Rounding") # if using R 3.5 or earlier, use `set.seed(1)`
+set.seed(1)
+train_index <- createDataPartition(filmography$rating, times = 1, p = 0.9, list = FALSE)
+train_set <- filmography[train_index,]
+temp_test_set <- filmography[-train_index,]
+
+tibble(Dataset = c("filmography", "train_set", "temp_test_set"),
+       "Number of ratings" = c(nrow(filmography), nrow(train_set), nrow(temp_test_set)))
+```
+I'll Make sure userId and movieId in the testing set are also in the training set set
+```{r}
+test_set <- temp_test_set %>% 
+      semi_join(train_set, by = "movieId") %>%
+      semi_join(train_set, by = "userId")
+```
+
+Next I'll Add rows removed from the testing set back into the training set set
+```{r}
+removed <- anti_join(temp_test_set, test_set)
+train_set <- rbind(train_set, removed)
+```
+## Random Guessing
+Random guessing is a simple and naive approach where predictions are made randomly without any consideration of the underlying patterns or information in the data. In the context of a recommendation system, random guessing involves assigning ratings or making recommendations randomly without taking into account user preferences, historical behavior, or any other relevant factors.
+
+
+### Random guessing model and predictions
+
+```{r, echo=FALSE}
+# Define rating range
+rating_range <- seq(0.5, 5, 0.5)
+
+# Define a function to calculate the proportion of correct guesses
+guess_right <- function(x, y) {
+  mean(y == x)
+}
+
+# Set seed for reproducibility
+set.seed(1)
+
+# Simulation: Generate random guesses
+simulation <- replicate(10000, {
+  sampled_ratings <- sample(train_set$rating, 1000, replace = TRUE)
+  sapply(rating_range, guess_right, sampled_ratings)
+})
+
+# Calculate mean correct guessing probabilities
+guess_prob <- sapply(1:nrow(simulation), function(i) mean(simulation[i,]))
+
+# Generate random predictions for the validation set
+y_hat_random <- sample(rating_range, 
+                       size = nrow(validation), 
+                       replace = TRUE, 
+                       prob = guess_prob)
+
+```
+## Evaluation Tibble Construction
+```{r, echo=FALSE}
+# Calculate evaluation metrics for the random guessing model
+evaluation <- tibble(
+  Model = c("Cinematch", "The Netflix Prize", "Random guessing"),
+  MAE = c(NA, NA, Metrics::mae(validation$rating, y_hat_random)),
+  MSE = c(NA, NA, Metrics::mse(validation$rating, y_hat_random)),
+  RMSE = c(0.9525, 0.85725, Metrics::rmse(validation$rating, y_hat_random))
+)
+print(evaluation)
+```
+
+## Linear Regression Model
+
+### Mean Baseline
+
+#### Mean baseline model construction
+```{r, echo=FALSE}
+# Calculate evaluation metrics for the mean baseline model
+mu <- mean(train_set$rating)
+y_hat_mean <- rep(mu, nrow(validation))
+
+# Update the evaluation tibble
+evaluation <- bind_rows(
+  evaluation,
+  tibble(
+    Model = "Linear model (mean baseline)",
+    MAE = Metrics::mae(validation$rating, y_hat_mean),
+    MSE = Metrics::mse(validation$rating, y_hat_mean),
+    RMSE = Metrics::rmse(validation$rating, y_hat_mean)
+  )
+)
+print(evaluation)
+```
+
+## Movie Bias
+```{r movie_bias, message=FALSE, warning=FALSE}
+# Group by Movie
+b_i <- train_set %>%
+  group_by(movieId) %>% 
+  summarize(
+    b_i = mean(rating - mu),
+    b_i_isolated = mean(rating)
+  )
+
+# Display the Top 10 Movie Biases
+b_i %>% slice_head(n = 10)
+```
+Next ill create two bias plot for movies and adjusted bias plot .
+The final result is a side-by-side comparison of the isolated and adjusted movie bias plots, providing insights into the distribution of bias values for movies in the dataset. 
+```{r Movie_Bias_Plots, echo=FALSE}
+# Isolated Movie Bias Plot
+b_i_isolated_plot <- b_i %>%
+  ggplot(aes(x = b_i_isolated)) + 
+  geom_histogram(bins = 20, fill = "#8888ff", color = "#4020dd") +
+  ggtitle("Movie Bias (isolated)") +
+  xlab("Bias value") +
+  ylab("Count") +
+  scale_y_continuous(labels = comma) +
+  scale_x_continuous(n.breaks = 10) +
+  theme_economist() +
+  theme(axis.title.x = element_text(vjust = -5, face = "bold"), 
+        axis.title.y = element_text(vjust = 10, face = "bold"), 
+        plot.margin = margin(0.7, 0.5, 1, 1.2, "cm"))
+
+# Adjusted Movie Bias Plot
+b_i_plot <- b_i %>%
+  ggplot(aes(x = b_i)) + 
+  geom_histogram(bins = 20, fill = "#8888ff", color = "#4020dd") +
+  ggtitle("Movie Bias (adjusted)") +
+  xlab("Bias value") +
+  ylab("Count") +
+  scale_y_continuous(labels = comma) +
+  scale_x_continuous(n.breaks = 10) +
+  theme_economist() +
+  theme(axis.title.x = element_text(vjust = -5, face = "bold"), 
+        axis.title.y = element_text(vjust = 10, face = "bold"), 
+        plot.margin = margin(0.7, 0.5, 1, 1.2, "cm"))
+
+# Combine Plots using plot_grid
+combined_plots <- cowplot::plot_grid(b_i_isolated_plot, b_i_plot, labels = "AUTO", nrow = 2)
+
+# Display the combined plot
+print(combined_plots)
+```
+
+## Linear Model construction (mean + movie bias)
+```{r}
+# Linear Model Construction (Mean + Movie Bias)
+y_hat_b_i <- mu + validation %>%
+  left_join(b_i, by = "movieId") %>%
+  .$b_i
+
+# Evaluation Metrics
+evaluation <- bind_rows(evaluation,
+                        tibble(Model = "Linear model (mean + movie bias)",
+                               MAE = Metrics::mae(validation$rating, y_hat_b_i),
+                               MSE = Metrics::mse(validation$rating, y_hat_b_i),
+                               RMSE = Metrics::rmse(validation$rating, y_hat_b_i)))
+
+# Print Evaluation Results
+print(evaluation)
+```
+
+Next ill create two bias plot for users and adjusted bias plot .
+The final result is a side-by-side comparison of the isolated and adjusted users bias plots, providing insights into the distribution of bias values for movies in the dataset. 
+
+## User Bias
+```{r}
+# Bias per user
+b_u <- train_set %>%
+  left_join(b_i, by = 'movieId') %>%
+  group_by(userId) %>% 
+  summarize(b_u = mean(rating - mu - b_i),
+            b_u_isolated = mean(rating))
+
+# Display top 10 rows of b_u
+b_u %>% slice_head(n = 10)
+
+# Isolated user bias plot
+b_u_isolated_plot <- b_u %>%
+  ggplot(aes(x = b_u_isolated)) + 
+  geom_histogram(bins = 20, fill = "#8888ff", color = "#4020dd") +
+  ggtitle("User Bias (isolated)") +
+  xlab("Bias value") +
+  ylab("Count") +
+  scale_y_continuous(labels = comma) +
+  scale_x_continuous(n.breaks = 10) +
+  theme_economist() +
+  theme(axis.title.x = element_text(vjust = -5, face = "bold"), 
+        axis.title.y = element_text(vjust = 10, face = "bold"), 
+        plot.margin = margin(0.7, 0.5, 1, 1.2, "cm"))
+
+# Adjusted user bias plot
+b_u_plot <- b_u %>%
+  ggplot(aes(x = b_u)) + 
+  geom_histogram(bins = 20, fill = "#8888ff", color = "#4020dd") +
+  ggtitle("User Bias (adjusted)") +
+  xlab("Bias value") +
+  ylab("Count") +
+  scale_y_continuous(labels = comma) +
+  scale_x_continuous(n.breaks = 10) +
+  theme_economist() +
+  theme(axis.title.x = element_text(vjust = -5, face = "bold"), 
+        axis.title.y = element_text(vjust = 10, face = "bold"), 
+        plot.margin = margin(0.7, 0.5, 1, 1.2, "cm"))
+
+# Combine both b_u plots with plot_grid()
+plot_grid(b_u_isolated_plot, b_u_plot, labels = "AUTO", nrow = 2)
+```
+# Linear Model Construction (mean + movie bias + user bias)
+he linear model predictions (y_hat_b_u) by incorporating mean, movie bias, and user bias. It then evaluates the performance of this linear model using Mean Absolute Error (MAE), Mean Squared Error (MSE), and Root Mean Squared Error (RMSE) metrics and appends the results to the evaluation tibble. Finally, it prints the evaluation results.
+```{r}
+y_hat_b_u <- validation %>%
+  left_join(b_i, by='movieId') %>%
+  left_join(b_u, by='userId') %>%
+  mutate(y_hat = mu + b_i + b_u) %>%
+  .$y_hat
+
+# Evaluation
+evaluation <- bind_rows(evaluation, 
+                        tibble(Model = "Linear model (mean + movie and user bias)",
+                               MAE = Metrics::mae(validation$rating, y_hat_b_u),
+                               MSE = Metrics::mse(validation$rating, y_hat_b_u),
+                               RMSE = Metrics::rmse(validation$rating, y_hat_b_u)))
+
+# Print evaluation results
+print(evaluation)
+```
+
+## Movie recommendations
+To obtain recommendations for our users, we will predict their ratings for movies they haven't watched yet.
+```{r}
+# Top 10 movie recommendation by the linear model
+top10_prediction_linear <- test_set %>%
+  left_join(b_i, by = "movieId") %>%
+  left_join(b_u, by = "userId") %>%
+  mutate(y_hat = mu + b_i + b_u) %>%
+  arrange(desc(y_hat)) %>%
+  select(title) %>%
+  unique() %>%
+  slice_head(n = 10)
+
+top10_prediction_linear_df <- data.frame(
+  Title = top10_prediction_linear,
+  Rating = rep(NA, 10), 
+  Count = rep(NA, 10)
+)
+
+for (i in 1:10) {
+  indexes <- which(test_set$title == as.character(top10_prediction_linear[i]))
+  top10_prediction_linear_df$Rating[i] <- mean(test_set$rating[indexes])
+  top10_prediction_linear_df$Count[i] <- sum(
+    test_set$title == as.character(top10_prediction_linear[i])
+  )
+}
+```
+## Print Top 10 Predictions
+```{r}
+cat("## Top 10 Movie Recommendations by the Linear Model\n")
+print(top10_prediction_linear_df)
+```
+
+## Worst 10 movie recommendation by the linear model
+```{r}
+worst10_prediction_linear <- test_set %>%
+  left_join(b_i, by = "movieId") %>%
+  left_join(b_u, by = "userId") %>%
+  mutate(y_hat = mu + b_i + b_u) %>%
+  arrange(b_i) %>%
+  select(title) %>%
+  unique() %>%
+  slice_head(n = 10)
+
+worst10_prediction_linear_df <- data.frame(
+  Title = worst10_prediction_linear,
+  Rating = rep(NA, 10),
+  Count = rep(NA, 10)
+)
+
+for (i in 1:10) {
+  indexes <- which(test_set$title == as.character(worst10_prediction_linear[i]))
+  worst10_prediction_linear_df$Rating[i] <- mean(test_set$rating[indexes])
+  worst10_prediction_linear_df$Count[i] <- sum(
+    test_set$title == as.character(worst10_prediction_linear[i])
+  )
+}
+```
+## Print Worst 10 Predictions
+```{r}
+cat("## Worst 10 Movie Recommendations by the Linear Model\n")
+print(worst10_prediction_linear_df)
+```
+## Regularization
+### Regularization function
+Using Regularization, we can fit our machine learning model appropriately on a given test set and hence reduce the errors in it.
+
+## Define a regularization function
+```{r}
+regularization <- function(lambda, train_set, test_set) {
+  # Calculate mean of ratings in the training set
+  mu <- mean(train_set$rating)
+
+  # Calculate movie bias (b_i)
+  b_i <- train_set %>% 
+    group_by(movieId) %>%
+    summarize(b_i = sum(rating - mu) / (n() + lambda))
+
+  # Calculate user bias (b_u)
+  b_u <- train_set %>% 
+    left_join(b_i, by = "movieId") %>%
+    filter(!is.na(b_i)) %>%
+    group_by(userId) %>%
+    summarize(b_u = sum(rating - mu - b_i) / (n() + lambda))
+
+  # Predict ratings using the trained biases
+  predicted_ratings <- test_set %>% 
+    left_join(b_i, by = "movieId") %>%
+    left_join(b_u, by = "userId") %>%
+    filter(!is.na(b_i), !is.na(b_u)) %>%
+    mutate(pred = mu + b_i + b_u) %>%
+    pull(pred)
+  
+  # Return the root mean square error (RMSE)
+  return(Metrics::rmse(predicted_ratings, test_set$rating))
+}
+
+# Test regularization function with different lambda values
+lambdas <- seq(0, 10, 0.25)
+lambdas_rmse <- sapply(lambdas,
+                       regularization, 
+                       train_set = train_set, 
+                       test_set = test_set)
+
+# Create a tibble to display lambda and corresponding RMSE values
+lambdas_tibble <- tibble(Lambda = lambdas, RMSE = lambdas_rmse)
+print(lambdas_tibble)
+```
+## Plot the effect of Lambda on RMSE
+```{r}
+lambdas_tibble %>%
+  ggplot(aes(x = Lambda, y = RMSE)) +
+  geom_point() +
+  ggtitle("Effect of Lambda on RMSE") +
+  xlab("Lambda") +
+  ylab("RMSE") +
+  scale_y_continuous(n.breaks = 6, labels = comma) +
+  scale_x_continuous(n.breaks = 10) +
+  theme_economist() +
+  theme(axis.title.x = element_text(vjust = -5, face = "bold"), 
+        axis.title.y = element_text(vjust = 10, face = "bold"), 
+        plot.margin = margin(0.7, 0.5, 1, 1.2, "cm"))
+```
+## Regularized linear model construction
+```{r}
+# Find the optimal lambda value that minimizes RMSE
+lambda <- lambdas[which.min(lambdas_rmse)]
+
+# Calculate the mean of ratings in the training set
+mu <- mean(train_set$rating)
+
+# Calculate regularized movie bias (b_i)
+b_i_regularized <- train_set %>% 
+  group_by(movieId) %>%
+  summarize(b_i = sum(rating - mu) / (n() + lambda))
+
+# Calculate regularized user bias (b_u)
+b_u_regularized <- train_set %>% 
+  left_join(b_i_regularized, by = "movieId") %>%
+  group_by(userId) %>%
+  summarize(b_u = sum(rating - b_i - mu) / (n() + lambda))
+
+# Predict ratings using regularized biases
+y_hat_regularized <- validation %>% 
+  left_join(b_i_regularized, by = "movieId") %>%
+  left_join(b_u_regularized, by = "userId") %>%
+  mutate(prediction = mu + b_i + b_u) %>%
+  pull(prediction)
+
+# Evaluate the model and update the evaluation table
+evaluation <- bind_rows(evaluation,
+                        tibble(Model = "Linear model with regularized bias",
+                               MAE  = Metrics::mae(validation$rating, y_hat_regularized),
+                               MSE  = Metrics::mse(validation$rating, y_hat_regularized),
+                               RMSE = Metrics::rmse(validation$rating, y_hat_regularized)))
+print(evaluation)
+```
+
+
+Next i'll use the regularized linear moel to recommend movies 
+```{r}
+# Top 10 movie recommendations by the regularized linear model
+top10_prediction_regularized <- test_set %>%
+  left_join(b_i_regularized, by = "movieId") %>%
+  left_join(b_u_regularized, by = "userId") %>%
+  mutate(y_hat = mu + b_i + b_u) %>%
+  arrange(desc(y_hat)) %>%
+  select(title) %>%
+  unique() %>%
+  slice_head(n = 10)
+```
+
+```{r}
+# Create a data frame for the top 10 predictions
+top10_prediction_regularized_df <- data.frame(Title = top10_prediction_regularized,
+                                              Rating = rep(NA, 10),
+                                              Count = rep(NA, 10))
+
+# Populate the data frame with actual ratings and counts
+for (i in 1:10) {
+  indexes <- which(test_set$title == as.character(top10_prediction_regularized[i]))
+  top10_prediction_regularized_df$Rating[i] <- mean(test_set$rating[indexes])
+  top10_prediction_regularized_df$Count[i] <- sum(
+    test_set$title == as.character(top10_prediction_regularized[i])
+  )
+}
+```
+
+```{r}
+# Print the top 10 recommendations
+print(top10_prediction_regularized_df)
+```
+
+```{r}
+# Worst 10 movie recommendations by the regularized linear model
+worst10_prediction_regularized <- test_set %>%
+  left_join(b_i_regularized, by = "movieId") %>%
+  left_join(b_u_regularized, by = "userId") %>%
+  mutate(y_hat = mu + b_i + b_u) %>%
+  arrange(y_hat) %>%
+  select(title) %>%
+  unique() %>%
+  slice_head(n = 10)
+
+# Create a data frame for the worst 10 predictions
+worst10_prediction_regularized_df <- data.frame(Title = worst10_prediction_regularized,
+                                                Rating = rep(NA, 10),
+                                                Count = rep(NA, 10))
+
+# Populate the data frame with actual ratings and counts
+for (i in 1:10) {
+  indexes <- which(test_set$title == as.character(worst10_prediction_regularized[i]))
+  worst10_prediction_regularized_df$Rating[i] <- mean(test_set$rating[indexes])
+  worst10_prediction_regularized_df$Count[i] <- sum(
+    test_set$title == as.character(worst10_prediction_regularized[i])
+  )
+}
+```
+
+```{r}
+# Print the worst 10 recommendations
+print(worst10_prediction_regularized_df)
+```
+## Matrix factorization
+
+Matrix factorization is a technique used in machine learning and collaborative filtering to decompose a matrix into the product of two lower-dimensional matrices. The goal is to represent the original matrix by capturing its latent factors in a more compact form. This technique is widely used in recommendation systems and other applications where data can be represented as a matrix
+## Prepare Training and Testing Sets
+```{r}
+set.seed(1)
+train_recosystem <- with(train_set, data_memory(user_index = userId, 
+                                                item_index = movieId,
+                                                rating     = rating))
+test_recosystem <- with(test_set, data_memory(user_index = userId, 
+                                              item_index = movieId, 
+                                              rating     = rating))
+```
+## Create Model object
+```{r}
+recommendation_system <- Reco()
+```
+## Tune the Model
+```{r}
+tuning <- recommendation_system$tune(train_recosystem, opts = list(dim = c(10, 20, 30),
+                                                                   lrate = c(0.1, 0.2),
+                                                                   nthread  = 4,
+                                                                   niter = 10))
+```
+## Train Model
+```{r}
+recommendation_system$train(train_recosystem, opts = c(tuning$min,
+                                                       nthread = 4,
+                                                       niter = 20))
+```
+## Make predictions
+```{r}
+y_hat_MF <- recommendation_system$predict(test_recosystem, out_memory())
+```
+## Evaluate Model Performance
+```{r}
+evaluation <- bind_rows(evaluation,
+                        tibble(Model = "Matrix factorization",
+                               MAE  = Metrics::mae(validation$rating, y_hat_MF),
+                               MSE  = Metrics::mse(validation$rating, y_hat_MF),
+                               RMSE = Metrics::rmse(validation$rating, y_hat_MF)))
+print(evaluation)
+```
+In machine learning, it is extremely helpful to have a single number to judge a model's performance, whether it be during training, cross-validation, or monitoring after deployment. Root mean square error is one of the most widely used measures for this
+## Movies Recommendations
+### Top 10 movie recommendation by the matrix factorization model
+```{r}
+top10_prediction_MF <- tibble(title = test_set$title, y_hat = y_hat_MF) %>%
+  arrange(desc(y_hat)) %>%
+  select(title) %>%
+  unique() %>%
+  slice_head(n = 10)
+top10_prediction_MF_df <- data.frame(Title = top10_prediction_MF,
+                                     Rating = rep(NA, 10),
+                                     Count = rep(NA, 10))
+
+for (i in 1:10) {
+  indexes <- which(test_set$title == as.character(top10_prediction_MF[i,]))
+  top10_prediction_MF_df$Rating[i] <- mean(test_set$rating[indexes])
+  top10_prediction_MF_df$Count[i] <- sum(
+    test_set$title == as.character(top10_prediction_MF[i,])
+  )
+}
+```
+
+```{r}
+# Top 10 movie recommendation
+print(top10_prediction_MF_df)
+```
+
+## Worst 10 movie recommendation by the matrix factorization model
+```{r}
+worst10_prediction_MF <- tibble(title = test_set$title, y_hat = y_hat_MF) %>%
+  arrange(y_hat) %>%
+  select(title) %>%
+  unique() %>%
+  slice_head(n = 10)
+worst10_prediction_MF_df <- data.frame(Title = worst10_prediction_MF,
+                                       Rating = rep(NA, 10),
+                                       Count = rep(NA, 10))
+
+for (i in 1:10) {
+  indexes <- which(test_set$title == as.character(worst10_prediction_MF[i,]))
+  worst10_prediction_MF_df$Rating[i] <- mean(test_set$rating[indexes])
+  worst10_prediction_MF_df$Count[i] <- sum(
+    test_set$title == as.character(worst10_prediction_MF[i,])
+  )
+}
+```
+
+```{r}
+print(worst10_prediction_MF_df)
+```
+## Conclusion
+* The project involved exploring various recommendation models and evaluating their performance using metrics like RMSE, MAE, and MSE.
+* Linear models with both movie and user bias, as well as the regularized linear model, outperform other approaches, achieving an RMSE of 0.5593.
+* Matrix factorization, while better than random guessing, didn't outperform the linear models.
+* Regularization proved beneficial in improving the model's generalization ability.
+* The choice of the most suitable model depends on factors like computational complexity, interpretability, and specific project requirements.
+* Further optimization and tuning could potentially enhance the performance of certain models.
