@@ -25,6 +25,10 @@ The project is implemented in R, providing insights into the effectiveness of re
 2. **Model Development**: Utilize the implemented models to predict top-rated and low-rated movies.
 3. **Performance Evaluation**: Evaluate model performance using Mean Absolute Error (MAE), Mean Squared Error (MSE), and Root Mean Squared Error (RMSE).
 
+## Project Details
+
+- **RPubs Page:** [Link to RPubs](https://rpubs.com/sommie-kay/1125135)
+
 ## Data Sources
 
 The primary data source for this project is the [MovieLens dataset](https://grouplens.org/datasets/movielens/), offering a rich collection of movie ratings from users. The dataset provides valuable information for training and evaluating recommendation models.
